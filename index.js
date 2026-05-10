@@ -1,226 +1,402 @@
-import { useState, useRef, useEffect } from "react";
+// ============================================================
+//  KraftyBI Arts & Crafts — Facebook Messenger Webhook Server
+//  Powered by Groq (FREE & FAST) + Smart Learning Memory
+// ============================================================
 
-const SYSTEM_PROMPT = `You are a smart, friendly customer service chatbot for KraftyBI Arts & Crafts, located in Lower Pakigne, Minglanilla, Cebu. You help customers with giveaways, party souvenirs, and customized items.
+const express = require("express");
+const axios = require("axios");
+const fs = require("fs");
+const app = express();
+app.use(express.json());
 
-LANGUAGE: Always reply in ENGLISH only. Keep it simple, warm, and friendly.
+// ── ENV VARIABLES ────────────────────────────────────────────
+const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
+const VERIFY_TOKEN      = process.env.VERIFY_TOKEN;
+const GROQ_API_KEY      = process.env.GROQ_API_KEY;
 
-REPLY STYLE: SHORT and DIRECT. Use line breaks and emojis. Never write long paragraphs.
+// ── Memory Files ─────────────────────────────────────────────
+const MEMORY_FILE    = "/tmp/kb_customers.json";
+const ORDERS_FILE    = "/tmp/kb_orders.json";
+const ANALYTICS_FILE = "/tmp/kb_analytics.json";
 
-PRICE LIST: https://kraftybi.my.canva.site
-
-BACK TO SCHOOL ITEMS:
-- 3D Name Tag: P150
-- 3D Pencil Topper: P139/set of 3
-- 3D Crayon Box (fits 24): P190 (crayons not included)
-- 3D Fat Cat Pen Holder: P215
-- 3D Desk Organizer: P185
-- 3D Letter Name Stand: P230
-- 3D Letter Keyboard Clicker: P69 (1 letter) +P20/extra
-- 3D Chunky Letter Charm: P79
-- 3D Flexi Robot/Brickman: P79
-- Engraved Bamboo Pen: P35 (no packaging min 10), P45 (with packaging), P49 (personalized diff names)
-- Engraved Monggol Pencil: P58/3pcs, P225/box (1 name only)
-- Bamboo Notebook: P115+
-- Customized Notepad: P35-P68
-- Mouse Pad: P75
-- Cord Organizer: P25
-- Activity Placemat: P12 (min 20)
-- Activity Book: P55 (with 3 crayons)
-- Canvas Tote Bag: P115-P135
-- Black Tote Bag: P155-P185
-- Reusable Loot Bag: P65-P85
-Back to school combos to suggest:
-- Option 1 (Complete Kit): Name Tag + Engraved Monggol Pencil Box + Pencil Topper + Crayon Box 🖍️ — "The full school starter pack!"
-- Option 2 (Budget Kit): Name Tag + Engraved Monggol Pencil Box + Pencil Topper 🎒 — "Perfect if they already have a crayon box!"
-- Teacher gift: Bamboo Pen + Notebook + Mouse Pad 🎁
-- Loot bag: Activity Book + Cord Organizer + Bag Tag
-
-ENGRAVED MONGGOL PENCIL PRICING RULES (very important):
-- If customer wants 1 layout/same name for all: P225/box (full box)
-- If customer wants DIFFERENT names per person: ask "How many names/students?" then calculate:
-  - Price = number of names x P58 (since we sell minimum 3pcs per name = P58 per set of 3)
-  - Example: 30 different names = 30 x P58 = P1,740 total
-  - Always explain: "P58 per student (3 pencils per name) 😊"
-- Always ask: "Will all pencils have the same name, or different names for each student?"
-
-GIVEAWAYS & SOUVENIRS:
-- Wooden Ref Magnet: P49 (regular), P55 (with photo)
-- Photo Ref Magnet: P20 (min 10)
-- Bubble Head Magnet: P39
-- Button Pin Badge: P20
-- Acrylic Keychain: P18
-- Faux Leather Bag Charm: P45
-- 3D Name Charm: P55 (1 name), P90 (2 names)
-- 3D Football Jersey Charm: P75
-- 3D Emergency Whistle: P49 (P47 for 12+)
-- Chip/Candy Bag: P10-P15
-- Paperbag Loot Bag: P35 (min 10)
-- Reusable Loot Bag: P65-P85 (min 10)
-- Activity Book: P55
-- Mini Pillow: P59-P79
-- Pocket Mirror: P55
-- Cord Organizer: P25
-- Magnetic Bookmark: P29-P39
-
-PAINT KITS:
-- Mini Series (Lego/Safari/Garden/Peppa/Dino/Cars/Dessert/Monster Inc): P45/set
-- Unicorn/Mermaid/Tropical/Tools: P49/set
-- Name Kit in Pouch: P55 (+P8/extra letter)
-- Mix Character Box: P75
-- Name Painting Kit in Box: P80 (+P8/extra letter)
-
-MUGS & DRINKWARE:
-- Full Print Mug: P65 (min 30), P80 (with ribbon), P95 (with box)
-- Customized Clear Mug: P85-P95
-- Mug with Bamboo Lid: P285
-- Clear Mug + Wooden Coaster: P215/set
-- Coffee Glass Cup with Straw: P115-P135
-- Soda Cup Tumbler: P185
-- Customized Tumbler: P95
-- Sports Jug: P159
-- Printed Mug + Rubber Coaster: P155/set
-- Mr & Mrs Gift Box: P485
-
-ENGRAVED WOODEN:
-- Engraved Coaster: P79 (no box), P110 (with box+ribbon)
-- Wooden Desk Clock: P215-P230
-- Engraved Spoon & Fork: P155/set
-- Engraved Wooden Fan: P65
-- Engraved Cellphone Stand: P75-P90
-- Back Scratcher: P65
-
-BAG TAGS:
-- Rectangular: P59, Luggage: P79, Circle: P79
-- Floral: P59, Fruits: P69, Dino: P85
-- Crayon: P85, Penguin: P98, Minnie Mouse: P98, Jurassic: P120
-
-BAGS:
-- Canvas Tote: P115-P135 | Black Tote: P155-P185
-- Burlap Bag: P290-P395
-
-ACCESSORIES:
-- Card Holder: P65 | Mini Jewelry Box: P159
-- Mouse Pad: P75 | Mini Magnetic Bookmark: P29-P39
-
-ON-SITE LIVE PRINTING:
-- Pouch 8x6in: P6,999-P12,999 | Bag 10x12in: P7,999-P18,999
-
-ORDER PROCESS:
-1. Ask item + event type
-2. Ask quantity + names (if personalized)
-3. Ask color/theme/design + event date
-4. Production: 5-14 days (excl Sundays)
-5. Collect: Name, Address, Contact, Order details, Theme, Label detail
-6. Payment: GCash/Maya 09272879339, Uno Digital Bank 30007019344326
-7. 50% DP within 24hrs to start
-8. Delivery: Maxim/Grab/Lalamove (customer books) or J&T nationwide
-9. Pickup: Minglanilla Lower Pakigne (Mon-Sat 11am-7pm)
-10. Photos: send high-res close-up to Meregypt@gmail.com
-
-UPSELLING: After item picked, suggest add-ons like ribbons (+P10-20), boxes, matching items.
-DISCOUNTS: 5% off wooden ref magnet for 70+ pcs. Whistle: P47/P57 for 12+ pcs.`;
-
-export default function App() {
-  const [messages, setMessages] = useState([
-    { role: "assistant", content: "Hello! 👋 Welcome to KraftyBI Arts & Crafts! 🎀\n\nWe make beautiful customized giveaways, souvenirs & personalized items!\n\nWhat can I help you with today? 😊" }
-  ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const bottomRef = useRef(null);
-
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
-  const send = async (text) => {
-    const msg = (text || input).trim();
-    if (!msg || loading) return;
-    const newMessages = [...messages, { role: "user", content: msg }];
-    setMessages(newMessages);
-    setInput("");
-    setLoading(true);
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 600,
-          system: SYSTEM_PROMPT,
-          messages: newMessages.map(m => ({ role: m.role, content: m.content }))
-        })
-      });
-      const data = await res.json();
-      const reply = data.content?.map(b => b.text || "").join("") || "Sorry, something went wrong.";
-      setMessages([...newMessages, { role: "assistant", content: reply }]);
-    } catch {
-      setMessages([...newMessages, { role: "assistant", content: "Oops! Something went wrong. Please try again 😅" }]);
-    }
-    setLoading(false);
-  };
-
-  const quickReplies = [
-    "Back to school items?",
-    "Birthday giveaways?",
-    "Corporate tokens?",
-    "How much wooden ref magnet?",
-    "Bag tags price?",
-    "Rush order?",
-    "How to order?"
-  ];
-
-  return (
-    <div style={{ fontFamily: "sans-serif", maxWidth: 420, margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column", background: "#fff0f8" }}>
-      {/* Header */}
-      <div style={{ background: "linear-gradient(135deg,#e91e8c,#9b59b6)", padding: "12px 16px", color: "#fff", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-        <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🎀</div>
-        <div>
-          <div style={{ fontWeight: "bold", fontSize: 14 }}>KraftyBI Arts & Crafts</div>
-          <div style={{ fontSize: 11, opacity: 0.85 }}>🟢 Online · Minglanilla, Cebu</div>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 6 }}>
-            {m.role === "assistant" && (
-              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#e91e8c,#9b59b6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🎀</div>
-            )}
-            <div style={{
-              maxWidth: "78%", padding: "9px 13px",
-              borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-              background: m.role === "user" ? "linear-gradient(135deg,#e91e8c,#9b59b6)" : "#fff",
-              color: m.role === "user" ? "#fff" : "#333",
-              fontSize: 13, boxShadow: "0 1px 4px rgba(233,30,140,0.15)", lineHeight: 1.6, whiteSpace: "pre-wrap"
-            }}>{m.content}</div>
-          </div>
-        ))}
-        {loading && (
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
-            <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg,#e91e8c,#9b59b6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>🎀</div>
-            <div style={{ background: "#fff", borderRadius: "18px 18px 18px 4px", padding: "10px 14px", boxShadow: "0 1px 4px rgba(233,30,140,0.15)", fontSize: 18, letterSpacing: 3 }}>
-              <span style={{ animation: "pulse 1s infinite", display: "inline-block" }}>•••</span>
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Quick Replies */}
-      <div style={{ padding: "8px 10px", overflowX: "auto", display: "flex", gap: 6, flexShrink: 0, background: "#fff0f8" }}>
-        {quickReplies.map((q, i) => (
-          <button key={i} onClick={() => send(q)} style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 20, border: "1.5px solid #e91e8c", background: "#fff", color: "#e91e8c", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", fontWeight: 500 }}>
-            {q}
-          </button>
-        ))}
-      </div>
-
-      {/* Input */}
-      <div style={{ padding: "10px 12px", background: "#fff", display: "flex", gap: 8, borderTop: "1px solid #fce4f3", flexShrink: 0 }}>
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
-          placeholder="Type a message..." style={{ flex: 1, padding: "10px 14px", borderRadius: 24, border: "1.5px solid #f8b4d9", fontSize: 13, outline: "none", background: "#fff0f8" }} />
-        <button onClick={() => send()} disabled={loading} style={{ background: "linear-gradient(135deg,#e91e8c,#9b59b6)", color: "#fff", border: "none", borderRadius: "50%", width: 42, height: 42, cursor: "pointer", fontSize: 18 }}>➤</button>
-      </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
-    </div>
-  );
+function loadJSON(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(file, "utf8")); }
+  catch { return fallback; }
 }
+function saveJSON(file, data) {
+  try { fs.writeFileSync(file, JSON.stringify(data, null, 2)); } catch {}
+}
+
+const conversations = {};
+
+// ── SYSTEM PROMPT ────────────────────────────────────────────
+function buildSystemPrompt(senderId) {
+  const customers = loadJSON(MEMORY_FILE, {});
+  const customer  = customers[senderId] || null;
+  const analytics = loadJSON(ANALYTICS_FILE, { popular: {}, questions: {} });
+
+  const popularItems = Object.entries(analytics.popular)
+    .sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([k, v]) => k + " (" + v + "x)").join(", ") || "none yet";
+
+  const returningInfo = customer
+    ? "RETURNING CUSTOMER: Name: " + (customer.name || "unknown") + ", Past orders: " + JSON.stringify(customer.orders ? customer.orders.slice(-2) : []) + ". Greet them by name. Ask if they want the same as last time or something new."
+    : "NEW CUSTOMER.";
+
+  return "You are a smart, friendly customer service chatbot for KraftyBI Arts & Crafts, located in Lower Pakigne, Minglanilla, Cebu. You help customers with giveaways, party souvenirs, and customized items.\n\n" +
+    returningInfo + "\n" +
+    "POPULAR ITEMS THIS WEEK: " + popularItems + "\n\n" +
+    "LANGUAGE: Always reply in ENGLISH only. Keep it simple, warm, and friendly.\n\n" +
+    "REPLY STYLE: SHORT and DIRECT. Use line breaks and emojis. Never write long paragraphs.\n\n" +
+    "PRICE LIST WEBSITE: https://kraftybi.my.canva.site\n\n" +
+    "==== BACK TO SCHOOL ITEMS ====\n" +
+    "- 3D Name Tag: P150\n" +
+    "- 3D Pencil Topper: P139/set of 3\n" +
+    "- 3D Crayon Box (fits 24): P190 (crayons not included)\n" +
+    "- 3D Fat Cat Pen Holder: P215\n" +
+    "- 3D Desk Organizer: P185\n" +
+    "- 3D Letter Name Stand: P230\n" +
+    "- 3D Letter Keyboard Clicker: P69 (1 letter) +P20/extra\n" +
+    "- 3D Chunky Letter Charm: P79\n" +
+    "- 3D Flexi Robot/Brickman: P79\n" +
+    "- Engraved Bamboo Pen: P35 (no packaging min 10), P45 (with packaging), P49 (personalized diff names)\n" +
+    "- Engraved Monggol Pencil Box: P225/box (1 name), P58/3pcs (diff names)\n" +
+    "- Bamboo Notebook: P115+\n" +
+    "- Customized Notepad: P35-P68\n" +
+    "- Mouse Pad: P75\n" +
+    "- Cord Organizer: P25\n" +
+    "- Activity Placemat: P12 (min 20)\n" +
+    "- Activity Book: P55 (with 3 crayons)\n" +
+    "- Canvas Tote Bag: P115-P135\n" +
+    "- Black Tote Bag: P155-P185\n" +
+    "- Reusable Loot Bag: P65-P85\n\n" +
+    "BACK TO SCHOOL COMBOS:\n" +
+    "- Option 1 (Complete Kit): Name Tag + Engraved Monggol Pencil Box + Pencil Topper + Crayon Box - The full school starter pack!\n" +
+    "- Option 2 (Budget Kit): Name Tag + Engraved Monggol Pencil Box + Pencil Topper - Perfect if they already have a crayon box!\n" +
+    "- Teacher Gift: Bamboo Pen + Notebook + Mouse Pad\n" +
+    "- Loot Bag: Activity Book + Cord Organizer + Bag Tag\n\n" +
+    "ENGRAVED MONGGOL PENCIL PRICING RULES (very important):\n" +
+    "- Same name for all: P225/box\n" +
+    "- Different names: Ask how many names/students. Price = number of names x P58 (3 pencils per name)\n" +
+    "- Example: 30 different names = 30 x P58 = P1,740\n" +
+    "- Always ask: Same name or different names per student?\n\n" +
+    "==== GIVEAWAYS & SOUVENIRS ====\n" +
+    "- Wooden Ref Magnet: P49 (regular), P55 (with photo) — 5% discount for 70+ pcs\n" +
+    "- Photo Ref Magnet: P20 (min 10)\n" +
+    "- Bubble Head Magnet: P39\n" +
+    "- Button Pin Badge: P20\n" +
+    "- Acrylic Keychain: P18\n" +
+    "- Faux Leather Bag Charm: P45\n" +
+    "- 3D Name Charm: P55 (1 name), P90 (2 names)\n" +
+    "- 3D Football Jersey Charm: P75\n" +
+    "- 3D Emergency Whistle: P49 (1 color, P47 for 12+), P59 (two-tone, P57 for 12+)\n" +
+    "- Chip/Candy Bag: P10-P15 (candies NOT included)\n" +
+    "- Paperbag Loot Bag: P35 (min 10)\n" +
+    "- Reusable Loot Bag: P65-P85 (min 10)\n" +
+    "- Activity Book: P55\n" +
+    "- Mini Pillow: P59-P79\n" +
+    "- Pocket Mirror: P55-P57\n" +
+    "- Cord Organizer: P25\n" +
+    "- Magnetic Bookmark: P29-P39\n\n" +
+    "==== PAINT KITS ====\n" +
+    "- Mini Series (Lego/Safari/Garden/Peppa/Dino/Cars/Dessert/Monster Inc): P45/set\n" +
+    "- Unicorn/Mermaid/Tropical/Tools: P49/set\n" +
+    "- Name Kit in Pouch (3-5 letters + free figurine): P55 (+P8/extra letter)\n" +
+    "- Mix Character Set in Box: P75\n" +
+    "- Name Painting Kit in Box (2-5 letters): P80 (+P8/extra letter)\n\n" +
+    "==== MUGS & DRINKWARE ====\n" +
+    "- Full Print Mug: P65 (min 30, no packaging), P80 (with ribbon), P95 (with box) +P5 personalized\n" +
+    "- Customized Clear Mug: P85 (plastic+ribbon), P95 (box+ribbon)\n" +
+    "- Mug with Bamboo Lid & Handle: P285\n" +
+    "- Clear Mug + Wooden Coaster: P215/set\n" +
+    "- Coffee Glass Cup with Straw: P115, P135 (box)\n" +
+    "- Soda Cup Tumbler: P185\n" +
+    "- Customized Tumbler: P95\n" +
+    "- Sports Jug: P159\n" +
+    "- Printed Mug + Rubber Coaster: P155/set\n" +
+    "- Mr & Mrs Gift Box: P485\n\n" +
+    "==== ENGRAVED WOODEN ====\n" +
+    "- Engraved Coaster: P79 (no box), P110 (with box+ribbon) +P10 other design\n" +
+    "- Wooden Desk Clock: P215 (text), P230 (logo+text)\n" +
+    "- Engraved Spoon & Fork: P155/set\n" +
+    "- Engraved Wooden Fan: P65\n" +
+    "- Engraved Cellphone Stand: P75 (1 side), P90 (2 sides)\n" +
+    "- Back Scratcher: P65\n\n" +
+    "==== BAG TAGS ====\n" +
+    "- Rectangular: P59 (+P10 dual color)\n" +
+    "- Luggage Tag: P79\n" +
+    "- Circle Tag: P79\n" +
+    "- Floral Tag: P59\n" +
+    "- Fruits Tag: P69\n" +
+    "- Dino Tag: P85\n" +
+    "- Crayon Tag: P85\n" +
+    "- Penguin Tag: P98\n" +
+    "- Minnie Mouse Tag: P98\n" +
+    "- Jurassic Tag: P120\n" +
+    "- Custom Bag Tags: price depends on design/colors (min 10 pcs)\n\n" +
+    "==== BAGS ====\n" +
+    "- Canvas Tote Bag: P115 (customized), P135 (personalized) 12x14in\n" +
+    "- Black Tote Bag: P155 (name/initial), P185 (full print) 12x14in\n" +
+    "- Burlap Bag: P290 (small), P395 (medium)\n\n" +
+    "==== ACCESSORIES ====\n" +
+    "- Pocket Mirror: P55 (glossy), P57 (glitter)\n" +
+    "- Card Holder: P65 (7 colors)\n" +
+    "- Mini Jewelry Box: P159\n" +
+    "- Mini Pillow: P59-P79\n" +
+    "- Mini Magnetic Bookmark: P29-P39\n\n" +
+    "==== ON-SITE LIVE PRINTING ====\n" +
+    "- Pouch 8x6in: P6,999 (30pcs), P8,999 (50pcs), P12,999 (80pcs)\n" +
+    "- Bag 10x12in: P7,999 (30pcs), P11,999 (50pcs), P18,999 (80pcs)\n" +
+    "- Includes: 3-4hrs on-site, booth, letters A-Z, 15-20 designs\n" +
+    "- +P300 transpo Cebu City, +P400 Mandaue\n\n" +
+    "==== ORDER PROCESS ====\n" +
+    "1. Ask what item and event type\n" +
+    "2. Ask quantity and names (if personalized)\n" +
+    "3. Ask color/theme/design + event date\n" +
+    "4. Production: 5-14 days (excl Sundays)\n" +
+    "5. Collect: Name, Address, Contact, Order details, Theme, Label detail\n" +
+    "6. Payment: GCash/Maya 09272879339, Uno Digital Bank 30007019344326\n" +
+    "7. 50% DP required within 24hrs to start production\n" +
+    "8. Delivery: Maxim/Grab/Lalamove (customer books) or J&T nationwide\n" +
+    "9. Pickup: Minglanilla Lower Pakigne (Mon-Sat 11am-7pm)\n" +
+    "10. Design files: send to Meregypt@gmail.com\n" +
+    "11. Photos: high resolution close-up required\n\n" +
+    "UPSELLING (friendly, never pushy): After item picked, suggest add-ons like ribbons (+P10-20), boxes, matching items.\n\n" +
+    "When order is confirmed, end with this hidden tag:\n" +
+    "ORDER_SAVED:{\"name\":\"...\",\"event\":\"...\",\"date\":\"...\",\"address\":\"...\",\"contact\":\"...\",\"items\":[{\"item\":\"...\",\"qty\":1,\"price\":0}],\"subtotal\":0}";
+}
+
+// ── 1. Webhook Verification ──────────────────────────────────
+app.get("/webhook", (req, res) => {
+  const mode      = req.query["hub.mode"];
+  const token     = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+    console.log("Webhook verified!");
+    res.status(200).send(challenge);
+  } else res.sendStatus(403);
+});
+
+// ── 2. Receive Messages ──────────────────────────────────────
+app.post("/webhook", async (req, res) => {
+  const body = req.body;
+  if (body.object !== "page") return res.sendStatus(404);
+
+  for (const entry of body.entry) {
+    for (const event of entry.messaging) {
+      if (!event.message || event.message.is_echo) continue;
+      const senderId = event.sender.id;
+      const userText = event.message.text;
+      if (!userText) continue;
+
+      console.log("Message from " + senderId + ": " + userText);
+      trackAnalytics(userText);
+      await sendTyping(senderId);
+
+      if (!conversations[senderId]) conversations[senderId] = [];
+      conversations[senderId].push({ role: "user", content: userText });
+      if (conversations[senderId].length > 20)
+        conversations[senderId] = conversations[senderId].slice(-20);
+
+      try {
+        const reply = await callGroq(conversations[senderId], buildSystemPrompt(senderId));
+
+        const orderMatch = reply.match(/ORDER_SAVED:(\{[\s\S]*?\})/);
+        if (orderMatch) {
+          try {
+            const orderData = JSON.parse(orderMatch[1]);
+            saveCustomerData(senderId, orderData);
+            saveOrder(senderId, orderData);
+          } catch(e) {}
+        }
+
+        const cleanReply = reply.replace(/ORDER_SAVED:[\s\S]*/, "").trim();
+        conversations[senderId].push({ role: "assistant", content: cleanReply });
+        await sendMessage(senderId, cleanReply);
+      } catch (err) {
+        console.error("Groq error:", err.message);
+        await sendMessage(senderId, "Sorry, there was a technical issue. Please try again! 😅");
+      }
+    }
+  }
+  res.sendStatus(200);
+});
+
+// ── 3. Save Customer ─────────────────────────────────────────
+function saveCustomerData(senderId, orderData) {
+  const customers = loadJSON(MEMORY_FILE, {});
+  if (!customers[senderId]) customers[senderId] = { name: orderData.name, orders: [] };
+  else if (orderData.name) customers[senderId].name = orderData.name;
+  customers[senderId].orders = customers[senderId].orders || [];
+  customers[senderId].orders.push({
+    date: orderData.date, event: orderData.event,
+    items: orderData.items, subtotal: orderData.subtotal,
+    createdAt: new Date().toISOString()
+  });
+  if (customers[senderId].orders.length > 5)
+    customers[senderId].orders = customers[senderId].orders.slice(-5);
+  saveJSON(MEMORY_FILE, customers);
+
+  const analytics = loadJSON(ANALYTICS_FILE, { popular: {}, questions: {} });
+  (orderData.items || []).forEach(function(it) {
+    analytics.popular[it.item] = (analytics.popular[it.item] || 0) + (it.qty || 1);
+  });
+  saveJSON(ANALYTICS_FILE, analytics);
+}
+
+// ── 4. Save Order ────────────────────────────────────────────
+function saveOrder(senderId, orderData) {
+  const orders = loadJSON(ORDERS_FILE, []);
+  orders.unshift({
+    id: Date.now(), senderId,
+    name: orderData.name || "Unknown",
+    event: orderData.event || "-",
+    date: orderData.date || "-",
+    address: orderData.address || "-",
+    contact: orderData.contact || "-",
+    items: orderData.items || [],
+    subtotal: orderData.subtotal || 0,
+    createdAt: new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila" })
+  });
+  if (orders.length > 100) orders.pop();
+  saveJSON(ORDERS_FILE, orders);
+}
+
+// ── 5. Track Analytics ───────────────────────────────────────
+function trackAnalytics(text) {
+  const analytics = loadJSON(ANALYTICS_FILE, { popular: {}, questions: {} });
+  const keywords = ["magnet","mug","tumbler","bag","tag","keychain","coaster","pen","pencil","notebook","pillow","charm","clicker","giveaway","souvenir","price","how much","rush","delivery","color","photo","design","custom","corporate","birthday","wedding","christening","graduation","school","back to school"];
+  keywords.forEach(function(kw) {
+    if (text.toLowerCase().includes(kw))
+      analytics.questions[kw] = (analytics.questions[kw] || 0) + 1;
+  });
+  saveJSON(ANALYTICS_FILE, analytics);
+}
+
+// ── 6. Dashboard ─────────────────────────────────────────────
+app.get("/dashboard", (req, res) => {
+  const orders    = loadJSON(ORDERS_FILE, []);
+  const customers = loadJSON(MEMORY_FILE, {});
+  const analytics = loadJSON(ANALYTICS_FILE, { popular: {}, questions: {} });
+
+  const totalCustomers = Object.keys(customers).length;
+  const totalOrders    = orders.length;
+  const totalRevenue   = orders.reduce(function(s, o) { return s + (o.subtotal || 0); }, 0);
+  const popular   = Object.entries(analytics.popular).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const questions = Object.entries(analytics.questions).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const ordersHTML = orders.map(function(o, i) {
+    return "<div class='order-card'>" +
+      "<div class='order-header'><span class='order-num'>Order #" + (totalOrders - i) + "</span><span class='order-time'>" + o.createdAt + "</span></div>" +
+      "<div class='order-grid'>" +
+      "<div><span class='label'>👤 Name</span> " + o.name + "</div>" +
+      "<div><span class='label'>📍 Address</span> " + o.address + "</div>" +
+      "<div><span class='label'>📅 Event Date</span> " + o.date + "</div>" +
+      "<div><span class='label'>🎉 Event</span> " + o.event + "</div>" +
+      "<div><span class='label'>📞 Contact</span> " + o.contact + "</div>" +
+      "</div>" +
+      "<table class='breakdown'><tr><th>Item</th><th>Qty</th><th>Price</th></tr>" +
+      (o.items || []).map(function(it) {
+        return "<tr><td>" + it.item + "</td><td>" + it.qty + "</td><td>P" + ((it.price || 0) * (it.qty || 1)).toLocaleString() + "</td></tr>";
+      }).join("") +
+      "<tr class='total-row'><td colspan='2'><b>Subtotal</b></td><td><b>P" + (o.subtotal || 0).toLocaleString() + "</b></td></tr>" +
+      "<tr><td colspan='2'>Delivery</td><td>Lalamove/Maxim rate</td></tr>" +
+      "</table></div>";
+  }).join("") || "<p style='color:#aaa;text-align:center'>No orders yet</p>";
+
+  res.send("<!DOCTYPE html><html><head><title>KraftyBI Dashboard</title>" +
+    "<meta name='viewport' content='width=device-width,initial-scale=1'>" +
+    "<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:sans-serif;background:#fff0f8;padding:16px}" +
+    "h1{color:#e91e8c;font-size:22px;margin-bottom:16px}h2{color:#e91e8c;font-size:15px;margin-bottom:10px}" +
+    ".overview{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}" +
+    ".stat{background:#fff;border-radius:12px;padding:14px;text-align:center;box-shadow:0 2px 8px rgba(233,30,140,0.1)}" +
+    ".stat-num{font-size:26px;font-weight:bold;color:#e91e8c}.stat-label{font-size:11px;color:#888;margin-top:4px}" +
+    ".section{background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px rgba(233,30,140,0.08)}" +
+    ".order-card{background:#fff5fb;border-radius:10px;padding:12px;margin-bottom:12px;border-left:4px solid #e91e8c}" +
+    ".order-header{display:flex;justify-content:space-between;margin-bottom:8px}" +
+    ".order-num{font-weight:bold;color:#e91e8c;font-size:13px}.order-time{font-size:11px;color:#aaa}" +
+    ".order-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px;font-size:12px}" +
+    ".label{font-weight:bold;color:#666;margin-right:4px}" +
+    ".breakdown{width:100%;border-collapse:collapse;font-size:12px}" +
+    ".breakdown th{background:#fce4f3;padding:6px;text-align:left;color:#e91e8c}" +
+    ".breakdown td{padding:6px;border-bottom:1px solid #fce4f3}" +
+    ".total-row td{background:#fff0f8;font-weight:bold}" +
+    "table.sm{width:100%;border-collapse:collapse;font-size:13px}" +
+    "table.sm td,table.sm th{padding:7px;border-bottom:1px solid #fce4f3}" +
+    "table.sm th{color:#e91e8c}" +
+    ".badge{background:#e91e8c;color:#fff;border-radius:20px;padding:2px 8px;font-size:11px}</style>" +
+    "</head><body>" +
+    "<h1>🎀 KraftyBI Arts & Crafts Dashboard</h1>" +
+    "<div class='overview'>" +
+    "<div class='stat'><div class='stat-num'>" + totalCustomers + "</div><div class='stat-label'>Customers</div></div>" +
+    "<div class='stat'><div class='stat-num'>" + totalOrders + "</div><div class='stat-label'>Orders</div></div>" +
+    "<div class='stat'><div class='stat-num'>P" + totalRevenue.toLocaleString() + "</div><div class='stat-label'>Revenue</div></div>" +
+    "</div>" +
+    "<div class='section'><h2>📦 Orders</h2>" + ordersHTML + "</div>" +
+    "<div class='section'><h2>🏆 Popular Items</h2><table class='sm'><tr><th>Item</th><th>Times Ordered</th></tr>" +
+    (popular.map(function(e) { return "<tr><td>" + e[0] + "</td><td><span class='badge'>" + e[1] + "x</span></td></tr>"; }).join("") || "<tr><td colspan='2' style='color:#aaa'>No data yet</td></tr>") +
+    "</table></div>" +
+    "<div class='section'><h2>❓ Most Asked</h2><table class='sm'><tr><th>Keyword</th><th>Times Asked</th></tr>" +
+    (questions.map(function(e) { return "<tr><td>" + e[0] + "</td><td><span class='badge'>" + e[1] + "x</span></td></tr>"; }).join("") || "<tr><td colspan='2' style='color:#aaa'>No data yet</td></tr>") +
+    "</table></div></body></html>");
+});
+
+// ── 7. Groq API ──────────────────────────────────────────────
+async function callGroq(messages, systemPrompt) {
+  const res = await axios.post(
+    "https://api.groq.com/openai/v1/chat/completions",
+    {
+      model: "llama-3.1-8b-instant",
+      messages: [{ role: "system", content: systemPrompt }].concat(messages),
+      max_tokens: 600,
+      temperature: 0.7
+    },
+    { headers: { "Authorization": "Bearer " + GROQ_API_KEY, "Content-Type": "application/json" } }
+  );
+  return res.data.choices[0].message.content;
+}
+
+// ── 8. Send Message ──────────────────────────────────────────
+async function sendMessage(recipientId, text) {
+  const chunks = splitMessage(text, 1900);
+  for (var i = 0; i < chunks.length; i++) {
+    await axios.post(
+      "https://graph.facebook.com/v19.0/me/messages?access_token=" + PAGE_ACCESS_TOKEN,
+      { recipient: { id: recipientId }, message: { text: chunks[i] } }
+    );
+  }
+}
+
+// ── 9. Typing ────────────────────────────────────────────────
+async function sendTyping(recipientId) {
+  await axios.post(
+    "https://graph.facebook.com/v19.0/me/messages?access_token=" + PAGE_ACCESS_TOKEN,
+    { recipient: { id: recipientId }, sender_action: "typing_on" }
+  ).catch(function() {});
+}
+
+// ── 10. Split Messages ───────────────────────────────────────
+function splitMessage(text, maxLen) {
+  if (text.length <= maxLen) return [text];
+  var chunks = [], start = 0;
+  while (start < text.length) {
+    var end = start + maxLen;
+    if (end < text.length) {
+      var b = text.lastIndexOf("\n", end) || text.lastIndexOf(" ", end);
+      if (b > start) end = b;
+    }
+    chunks.push(text.slice(start, end).trim());
+    start = end;
+  }
+  return chunks;
+}
+
+// ── 11. Health Check ─────────────────────────────────────────
+app.get("/", function(req, res) {
+  res.send("KraftyBI Arts & Crafts Bot is running! 🎀");
+});
+
+var PORT = process.env.PORT || 3000;
+app.listen(PORT, function() {
+  console.log("Server running on port " + PORT);
+});
