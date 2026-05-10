@@ -161,7 +161,18 @@ function buildSystemPrompt(senderId) {
     "9. Pickup: Minglanilla Lower Pakigne (Mon-Sat 11am-7pm)\n" +
     "10. Design files: send to Meregypt@gmail.com\n" +
     "11. Photos: high resolution close-up required\n\n" +
-    "UPSELLING (friendly, never pushy): After item picked, suggest add-ons like ribbons (+P10-20), boxes, matching items.\n\n" +
+    "GENERAL REPLY RULES (very important):\n" +
+    "- ALWAYS keep replies SHORT. Maximum 5 lines per message.\n" +
+    "- If customer says 'HM', 'how much', or 'magkano' WITHOUT specifying an item, reply:\n" +
+    "  'Which item are you looking for? 😊\n" +
+    "   Check our full list here: https://kraftybi.my.canva.site'\n" +
+    "- If customer asks about an event without specifying items, reply:\n" +
+    "  'What item are you looking for? 😊\n" +
+    "   See all products: https://kraftybi.my.canva.site'\n" +
+    "- Always be direct. Never give long explanations unless asked.\n" +
+    "- When giving prices, use this format:\n" +
+    "  [Item]: P[price] ([short note])\n" +
+    "- End every product reply with: 'Full list: https://kraftybi.my.canva.site'\n\n" +
     "When order is confirmed, end with this hidden tag:\n" +
     "ORDER_SAVED:{\"name\":\"...\",\"event\":\"...\",\"date\":\"...\",\"address\":\"...\",\"contact\":\"...\",\"items\":[{\"item\":\"...\",\"qty\":1,\"price\":0}],\"subtotal\":0}";
 }
